@@ -4,6 +4,7 @@ import Leaderboard from './Leaderboard';
 import Tracker from './Tracker';
 import Settings from './Settings';
 import PINModal from './PINModal';
+import { StoreProvider } from './store';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('leaderboard');
@@ -61,6 +62,7 @@ function App() {
   };
 
   return (
+    <StoreProvider>
     <div className="container">
       {/* Header */}
       <div className="header">
@@ -73,7 +75,7 @@ function App() {
 
       {/* Content */}
       <div className="content">
-        {currentPage === 'leaderboard' && <Leaderboard onRequirePIN={handleRequirePIN} />}
+        {currentPage === 'leaderboard' && <Leaderboard />}
         {currentPage === 'tracker' && <Tracker onRequirePIN={handleRequirePIN} />}
         {currentPage === 'settings' && <Settings onUpdateTitle={updateAppTitle} />}
       </div>
@@ -108,6 +110,7 @@ function App() {
         />
       )}
     </div>
+    </StoreProvider>
   );
 }
 

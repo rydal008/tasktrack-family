@@ -1,155 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { supabase, getCycleStartDate, getCycleEndDate } from './supabaseClient';
+import React, { useState } from 'react';
 import { AvatarDisplay } from './Avatars';
-
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const DEMO_MODE = true; // Set to false when connected to real Supabase
+import AddTaskModal from './AddTaskModal';
+import {
+  useStore, DAY_NAMES, DAY_SHORT, getFrequency,
+  startOfWeek, weekDates, dayIndexOf, dateKey, formatDate, isSameDay
+} from './store';
 
 export default function Tracker({ onRequirePIN }) {
-  const [currentDayIndex, setCurrentDayIndex] = useState(1); // Tuesday (today)
-  const [tasks, setTasks] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [completions, setCompletions] = useState({});
+  const { data, addTask, updateTask, removeTask, setCompletion, getCompletion } = useStore();
+
+  const today = new Date();
+  const weekStart = startOfWeek(today);
+  const dates = weekDates(weekStart);
+
+  const [dayIndex, setDayIndex] = useState(dayIndexOf(today));
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedCell, setSelectedCell] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [currentFileIndex, setCurrentFileIndex] = useState(0);
-  const [demoData, setDemoData] = useState(true);
 
-  useEffect(() => {
-    if (DEMO_MODE) {
-      // Demo data
-      setMembers([
-        { id: '1', name: 'Alx', avatar: 'avatar-1' },
-        { id: '2', name: 'Jor', avatar: 'avatar-2' },
-        { id: '3', name: 'Sam', avatar: 'avatar-5' },
-        { id: '4', name: 'Cas', avatar: 'avatar-6' }
-      ]);
-      setTasks([
-        { id: '1', name: 'Morning Brush', points: 1, members: ['1', '2', '3'] },
-        { id: '2', name: 'Evening Brush', points: 1, members: ['1', '2', '3'] },
-        { id: '3', name: 'Clean Washroom', points: 2, members: ['4'] },
-        { id: '4', name: 'Homework', points: 2, members: ['1', '2', '3', '4'] }
-      ]);
-      // Demo completion states: completed (✓), pending (⏳), approved (✓✓)
-      setCompletions({
-        '1-1': 'completed', // Morning Brush - Alx - completed
-        '1-2': 'pending',   // Morning Brush - Jor - pending
-        '1-3': 'approved',  // Morning Brush - Sam - approved
-        '2-1': 'incomplete',// Evening Brush - Alx - incomplete
-        '2-2': 'completed', // Evening Brush - Jor - completed
-        '2-3': 'incomplete',// Evening Brush - Sam - incomplete
-        '3-4': 'approved',  // Clean Washroom - Cas - approved
-        '4-1': 'approved',  // Homework - Alx - approved
-        '4-2': 'completed', // Homework - Jor - completed
-        '4-3': 'completed', // Homework - Sam - completed
-        '4-4': 'approved'   // Homework - Cas - approved
-      });
-    }
-  }, []);
+  const date = dates[dayIndex];
+  const dk = dateKey(date);
+  const isToday = isSameDay(date, today);
 
-  const getDateForDay = (dayIndex) => {
-    const date = new Date(2024, 6, 15); // July 15, 2024 (start date)
-    date.setDate(date.getDate() + dayIndex);
-    return date;
-  };
-
-  const dayName = DAYS[currentDayIndex];
-  const date = getDateForDay(currentDayIndex);
-  const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const isToday = currentDayIndex === 1;
-
-  const canAdvanceDay = () => {
-    // Can advance if today's tasks are complete or not today
-    if (!isToday) return true;
-    return tasks.every(task => 
-      task.members.every(memberId => 
-        ['approved', 'completed'].includes(completions[`${task.id}-${memberId}`])
-      )
-    );
-  };
-
-  const previousDay = () => {
-    if (currentDayIndex > 0) {
-      setCurrentDayIndex(currentDayIndex - 1);
-    }
-  };
-
-  const nextDay = () => {
-    if (!canAdvanceDay() && isToday) {
-      alert('❌ Please complete all tasks for today before moving to the next day.');
-      return;
-    }
-    if (currentDayIndex < 6) {
-      setCurrentDayIndex(currentDayIndex + 1);
-    }
-  };
-
-  const handleCheckClick = (taskId, memberId, currentState) => {
-    const cellKey = `${taskId}-${memberId}`;
-    setSelectedCell({ taskId, memberId, key: cellKey, currentState });
-
-    if (currentState === 'completed') {
-      // Show upload modal
-      setUploadedFiles([]);
-      setCurrentFileIndex(0);
-      setShowUploadModal(true);
-    } else if (currentState === 'pending') {
-      // Show review modal for parent
-      setShowReviewModal(true);
-    } else if (currentState === 'approved') {
-      alert('✓✓ This task was already approved by parent!');
-    } else {
-      // Mark as incomplete (no upload needed)
-      setCompletions(prev => ({
-        ...prev,
-        [cellKey]: 'incomplete'
-      }));
-      alert('✓ Marked as incomplete');
-    }
-  };
-
-  const submitEvidence = () => {
-    if (uploadedFiles.length === 0) {
-      alert('Please upload at least one photo or video');
-      return;
-    }
-    
-    const cellKey = selectedCell.key;
-    setCompletions(prev => ({
-      ...prev,
-      [cellKey]: 'pending'
-    }));
-    setShowUploadModal(false);
-    alert('✓ Evidence submitted! Waiting for parent review...');
-  };
-
-  const approveEvidence = () => {
-    // Show PIN modal
-    onRequirePIN((pin) => {
-      // In demo, accept any 4+ digit PIN
-      if (pin.length >= 4) {
-        const cellKey = selectedCell.key;
-        setCompletions(prev => ({
-          ...prev,
-          [cellKey]: 'approved'
-        }));
-        setShowReviewModal(false);
-        alert('✓ Task approved! Evidence deleted. Check shows ✓✓');
-      } else {
-        alert('❌ Invalid PIN');
-      }
-    });
-  };
-
-  const getTasksForDay = () => {
-    return tasks;
-  };
-
-  const getCompletionStatus = (taskId, memberId) => {
-    return completions[`${taskId}-${memberId}`] || 'incomplete';
-  };
+  const tasksToday = data.tasks.filter(task =>
+    getFrequency(task.frequency).days.includes(dayIndex)
+  );
 
   const getCheckIcon = (status) => {
     switch (status) {
@@ -160,108 +38,231 @@ export default function Tracker({ onRequirePIN }) {
     }
   };
 
+  const handleCheckClick = (task, member) => {
+    const status = getCompletion(dk, task.id, member.id);
+    setSelectedCell({ dk, taskId: task.id, memberId: member.id, taskName: task.name });
+
+    if (status === 'incomplete') {
+      setCompletion(dk, task.id, member.id, 'completed');
+    } else if (status === 'completed') {
+      setUploadedFiles([]);
+      setShowUploadModal(true);
+    } else if (status === 'pending') {
+      setShowReviewModal(true);
+    } else {
+      alert('✓✓ Already approved by a parent.');
+    }
+  };
+
+  const submitEvidence = () => {
+    if (uploadedFiles.length === 0) return;
+    setCompletion(selectedCell.dk, selectedCell.taskId, selectedCell.memberId, 'pending');
+    setShowUploadModal(false);
+    alert('✓ Evidence submitted. Waiting for a parent to review.');
+  };
+
+  const undoCompletion = () => {
+    setCompletion(selectedCell.dk, selectedCell.taskId, selectedCell.memberId, 'incomplete');
+    setShowUploadModal(false);
+  };
+
+  const approveEvidence = () => {
+    onRequirePIN((pin) => {
+      if (pin.length >= 4) {
+        setCompletion(selectedCell.dk, selectedCell.taskId, selectedCell.memberId, 'approved');
+        setShowReviewModal(false);
+        alert('✓ Approved. Evidence deleted.');
+      } else {
+        alert('❌ Invalid PIN');
+      }
+    });
+  };
+
+  const rejectEvidence = () => {
+    setCompletion(selectedCell.dk, selectedCell.taskId, selectedCell.memberId, 'completed');
+    setShowReviewModal(false);
+  };
+
+  const openNewTask = () => {
+    if (data.members.length === 0) {
+      alert('Add a family member first, on the Leaderboard page.');
+      return;
+    }
+    setEditingTask(null);
+    setShowTaskModal(true);
+  };
+
+  const openEditTask = (task) => {
+    setEditingTask(task);
+    setShowTaskModal(true);
+  };
+
+  const handleSaveTask = (fields) => {
+    if (editingTask) {
+      updateTask(editingTask.id, fields);
+    } else {
+      addTask(fields);
+    }
+    setShowTaskModal(false);
+  };
+
+  const handleDeleteTask = () => {
+    if (window.confirm(`Delete the task "${editingTask.name}"?`)) {
+      removeTask(editingTask.id);
+      setShowTaskModal(false);
+    }
+  };
+
   return (
     <div className="page">
-      {/* Day Navigation */}
+      {/* Day navigation */}
       <div className="day-header">
         <div>
-          <h2>{dayName}</h2>
-          <p className="day-meta">{formattedDate} {isToday ? '(Today)' : ''}</p>
+          <h2>{DAY_NAMES[dayIndex]}</h2>
+          <p className="day-meta">{formatDate(date)}{isToday ? ' (Today)' : ''}</p>
         </div>
         <div className="day-nav">
-          <button onClick={previousDay} disabled={currentDayIndex === 0}>← Prev</button>
-          <button onClick={nextDay} disabled={currentDayIndex === 6}>Next →</button>
+          <button onClick={() => setDayIndex(dayIndex - 1)} disabled={dayIndex === 0}>← Prev</button>
+          <button onClick={() => setDayIndex(dayIndex + 1)} disabled={dayIndex === 6}>Next →</button>
         </div>
+      </div>
+
+      {/* Whole week at a glance */}
+      <div className="week-strip">
+        {dates.map((d, i) => (
+          <button
+            key={i}
+            className={`week-day${i === dayIndex ? ' selected' : ''}${isSameDay(d, today) ? ' today' : ''}`}
+            onClick={() => setDayIndex(i)}
+          >
+            {DAY_SHORT[i]}
+          </button>
+        ))}
+      </div>
+
+      <div className="section-actions">
+        <div className="summary-title" style={{ marginBottom: 0 }}>
+          {tasksToday.length} {tasksToday.length === 1 ? 'task' : 'tasks'} today
+        </div>
+        <button className="btn-add" onClick={openNewTask}>+ Add Task</button>
       </div>
 
       {/* Tasks */}
       <div className="tasks-container">
-        {getTasksForDay().map(task => (
-          <div key={task.id} className="task-card">
-            <div className="task-header">
-              <h3>{task.name}</h3>
-              <span className="task-points">{task.points} pts</span>
-            </div>
+        {tasksToday.length === 0 && (
+          <div className="empty-state">
+            <p>No tasks scheduled for {DAY_NAMES[dayIndex]}.</p>
+            <p style={{ fontSize: '13px' }}>Tap “+ Add Task” to create one.</p>
+          </div>
+        )}
 
-            <div className="task-checklist">
-              {members
-                .filter(m => task.members.includes(m.id))
-                .map(member => {
-                  const status = getCompletionStatus(task.id, member.id);
-                  const icon = getCheckIcon(status);
-                  
+        {tasksToday.map(task => {
+          const assigned = data.members.filter(m => task.members.includes(m.id));
+
+          return (
+            <div key={task.id} className="task-card">
+              <div className="task-header">
+                <div className="task-title-wrap">
+                  <h3>{task.name}</h3>
+                  <div className="task-meta">{getFrequency(task.frequency).label} · {getFrequency(task.frequency).sub}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span className="task-points">{task.points} pts</span>
+                  <button className="btn-edit" onClick={() => openEditTask(task)} aria-label="Edit task">✎</button>
+                </div>
+              </div>
+
+              <div className="task-checklist">
+                {assigned.length === 0 && (
+                  <div className="task-meta">No one assigned yet — tap ✎ to assign.</div>
+                )}
+
+                {assigned.map(member => {
+                  const status = getCompletion(dk, task.id, member.id);
+
                   return (
                     <div
                       key={member.id}
                       className={`check-row status-${status}`}
-                      onClick={() => handleCheckClick(task.id, member.id, status)}
+                      onClick={() => handleCheckClick(task, member)}
                     >
                       <div style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <AvatarDisplay avatarId={member.avatar} size={28} />
                       </div>
                       <span className="member-name">{member.name}</span>
-                      <div className={`check-icon ${status}`}>{icon}</div>
+                      <div className={`check-icon ${status}`}>{getCheckIcon(status)}</div>
                     </div>
                   );
                 })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Summary */}
-      <div className="day-summary">
-        <div className="summary-title">Progress Summary</div>
-        <div className="summary-grid">
-          {members.map(member => {
-            const assignedTasks = tasks.filter(t => t.members.includes(member.id));
-            const completedTasks = assignedTasks.filter(t => 
-              ['completed', 'approved'].includes(getCompletionStatus(t.id, member.id))
-            ).length;
-            const percentage = assignedTasks.length > 0 
-              ? Math.round((completedTasks / assignedTasks.length) * 100)
-              : 0;
+      {data.members.length > 0 && (
+        <div className="day-summary">
+          <div className="summary-title">Progress Summary</div>
+          <div className="summary-grid">
+            {data.members.map(member => {
+              const assignedTasks = tasksToday.filter(t => t.members.includes(member.id));
+              const doneTasks = assignedTasks.filter(t =>
+                ['completed', 'pending', 'approved'].includes(getCompletion(dk, t.id, member.id))
+              ).length;
+              const percentage = assignedTasks.length > 0
+                ? Math.round((doneTasks / assignedTasks.length) * 100)
+                : 0;
 
-            return (
-              <div key={member.id} className="summary-item">
-                <div className="summary-kid-header">
-                  <div style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center' }}>
-                    <AvatarDisplay avatarId={member.avatar} size={20} />
+              return (
+                <div key={member.id} className="summary-item">
+                  <div className="summary-kid-header">
+                    <div style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center' }}>
+                      <AvatarDisplay avatarId={member.avatar} size={20} />
+                    </div>
+                    <div className="summary-name">{member.name}</div>
                   </div>
-                  <div className="summary-name">{member.name}</div>
+                  <div className="progress-bar-container">
+                    <div className="progress-bar" style={{ width: `${percentage}%` }}></div>
+                  </div>
+                  <div className="summary-status">{doneTasks}/{assignedTasks.length} today</div>
                 </div>
-                <div className="progress-bar-container">
-                  <div className="progress-bar" style={{ width: `${percentage}%` }}></div>
-                </div>
-                <div className="summary-status">{completedTasks}/{assignedTasks.length} today</div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Upload Modal */}
+      {/* Add / Edit task */}
+      {showTaskModal && (
+        <AddTaskModal
+          members={data.members}
+          task={editingTask}
+          onSave={handleSaveTask}
+          onDelete={editingTask ? handleDeleteTask : null}
+          onClose={() => setShowTaskModal(false)}
+        />
+      )}
+
+      {/* Upload evidence */}
       {showUploadModal && (
         <div className="modal active" onClick={() => setShowUploadModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-title">📸 Submit Evidence</div>
-            <div className="modal-body">Take a photo or video proving you completed the task!</div>
+            <div className="modal-body">Take a photo or video proving you finished “{selectedCell.taskName}”.</div>
 
             <div className="upload-options">
-              <button 
+              <button
                 className="upload-btn"
-                onClick={() => {
-                  setUploadedFiles([...uploadedFiles, { type: 'photo', name: `photo_${uploadedFiles.length + 1}.jpg` }]);
-                }}
+                onClick={() => setUploadedFiles([...uploadedFiles, { type: 'photo', name: `photo_${uploadedFiles.length + 1}.jpg` }])}
+                disabled={uploadedFiles.length >= 5}
               >
                 <span className="upload-icon">📷</span>
                 Take Photo
               </button>
-              <button 
+              <button
                 className="upload-btn"
-                onClick={() => {
-                  setUploadedFiles([...uploadedFiles, { type: 'video', name: `video_${uploadedFiles.length + 1}.mp4 (8 sec)` }]);
-                }}
+                onClick={() => setUploadedFiles([{ type: 'video', name: 'video_1.mp4 (8 sec)' }])}
               >
                 <span className="upload-icon">🎥</span>
                 Record Video
@@ -279,23 +280,24 @@ export default function Tracker({ onRequirePIN }) {
             )}
 
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowUploadModal(false)}>Skip</button>
-              {uploadedFiles.length > 0 && (
-                <button className="btn-confirm" onClick={submitEvidence}>Submit Evidence</button>
-              )}
+              <button className="btn-cancel" onClick={undoCompletion}>Undo ✓</button>
+              <button className="btn-confirm" onClick={submitEvidence} disabled={uploadedFiles.length === 0}
+                style={{ opacity: uploadedFiles.length === 0 ? 0.5 : 1 }}>
+                Submit Evidence
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Review Modal */}
+      {/* Parent review */}
       {showReviewModal && (
         <div className="modal active" onClick={() => setShowReviewModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-title">🔍 Review Evidence</div>
             <div className="carousel-placeholder">📸 Photo/Video Preview</div>
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowReviewModal(false)}>Not OK</button>
+              <button className="btn-cancel" onClick={rejectEvidence}>Not OK</button>
               <button className="btn-confirm" onClick={approveEvidence}>OK ✓</button>
             </div>
           </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 
 export default function Settings({ onUpdateTitle }) {
   const [customTitle, setCustomTitle] = useState('');
-  const [cycleType, setCycleType] = useState(7);
   const [titlePreview, setTitlePreview] = useState('TaskTrack');
 
   useEffect(() => {
@@ -59,37 +58,9 @@ export default function Settings({ onUpdateTitle }) {
       <div className="settings-section">
         <h3 className="settings-title">🔄 Cycle Configuration</h3>
         
-        <div className="radio-group">
-          <label className="radio-option">
-            <input
-              type="radio"
-              name="cycle"
-              value="3"
-              checked={cycleType === 3}
-              onChange={(e) => setCycleType(3)}
-            />
-            <span>3-Day Cycle</span>
-          </label>
-          <label className="radio-option">
-            <input
-              type="radio"
-              name="cycle"
-              value="7"
-              checked={cycleType === 7}
-              onChange={(e) => setCycleType(7)}
-            />
-            <span>7-Day Cycle</span>
-          </label>
-          <label className="radio-option">
-            <input
-              type="radio"
-              name="cycle"
-              value="30"
-              checked={cycleType === 30}
-              onChange={(e) => setCycleType(30)}
-            />
-            <span>30-Day Cycle</span>
-          </label>
+        <div className="settings-hint">
+          📅 The cycle is one full week: <strong>Monday to Sunday</strong>.<br />
+          Scores reset every Monday morning.
         </div>
       </div>
 
