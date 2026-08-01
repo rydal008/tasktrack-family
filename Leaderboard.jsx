@@ -6,7 +6,7 @@ import {
 } from './store';
 
 export default function Leaderboard() {
-  const { data, addMember, removeMember } = useStore();
+  const { data, loading, addMember, removeMember } = useStore();
   const [showAddMember, setShowAddMember] = useState(false);
 
   const today = new Date();
@@ -71,7 +71,9 @@ export default function Leaderboard() {
       </div>
 
       {/* Leaderboard */}
-      {scores.length === 0 ? (
+      {loading ? (
+        <div className="empty-state"><p>Loading…</p></div>
+      ) : scores.length === 0 ? (
         <div className="empty-state">
           <p>No family members yet.</p>
           <p style={{ fontSize: '13px' }}>Tap “+ Add Member” to get started.</p>

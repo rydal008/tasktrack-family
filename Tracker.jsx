@@ -7,7 +7,7 @@ import {
 } from './store';
 
 export default function Tracker({ onRequirePIN }) {
-  const { data, addTask, updateTask, removeTask, setCompletion, getCompletion } = useStore();
+  const { data, loading, addTask, updateTask, removeTask, setCompletion, getCompletion } = useStore();
 
   const today = new Date();
   const weekStart = startOfWeek(today);
@@ -149,7 +149,9 @@ export default function Tracker({ onRequirePIN }) {
 
       {/* Tasks */}
       <div className="tasks-container">
-        {tasksToday.length === 0 && (
+        {loading && <div className="empty-state"><p>Loading…</p></div>}
+
+        {!loading && tasksToday.length === 0 && (
           <div className="empty-state">
             <p>No tasks scheduled for {DAY_NAMES[dayIndex]}.</p>
             <p style={{ fontSize: '13px' }}>Tap “+ Add Task” to create one.</p>

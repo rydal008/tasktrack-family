@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { supabase } from './supabaseClient';
 
 // Single source of truth for members, tasks and completions.
-// Saved in this browser only (localStorage). Swap this file for Supabase later.
+// Uses Supabase when it is configured, otherwise falls back to this browser's
+// localStorage so the app still works offline / without env vars.
 
 const STORAGE_KEY = 'tasktrack.data.v1';
 
@@ -81,11 +83,11 @@ export function scoreForWeek(data, memberId, weekStart) {
   return { earned, possible };
 }
 
-/* ---------- store ---------- */
+/* ---------- local fallback storage ---------- */
 
 const EMPTY = { members: [], tasks: [], completions: {} };
 
-function loadData() {
+function loadLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return EMPTY;
@@ -105,55 +107,192 @@ function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+/* ---------- store ---------- */
+
 const StoreContext = createContext(null);
 
 export function StoreProvider({ children }) {
-  const [data, setData] = useState(loadData);
+  const online = !!supabase;
+  const [data, setData] = useState(() => (online ? EMPTY : loadLocal()));
+  const [loading, setLoading] = useState(online);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (err) {
-      console.warn('Could not save data.', err);
+    if (!online) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (err) {
+        console.warn('Could not save data.', err);
+      }
     }
-  }, [data]);
+  }, [data, online]);
 
-  const addMember = ({ name, avatar }) =>
-    setData(d => ({ ...d, members: [...d.members, { id: newId(), name, avatar }] }));
+  const failed = (action, error) => {
+    console.error(`${action} failed:`, error);
+    alert(`Could not ${action}.\n\n${error.message}`);
+  };
 
-  const removeMember = (memberId) =>
-    setData(d => ({
-      ...d,
-      members: d.members.filter(m => m.id !== memberId),
-      tasks: d.tasks.map(t => ({ ...t, members: t.members.filter(id => id !== memberId) }))
-    }));
+  // Pull everything for the current week in one go.
+  const fetchAll = useCallback(async () => {
+    const dates = weekDates(startOfWeek());
 
-  const addTask = ({ name, points, frequency, members }) =>
-    setData(d => ({
-      ...d,
-      tasks: [...d.tasks, { id: newId(), name, points, frequency, members }]
-    }));
+    const [mRes, tRes, tmRes, cRes] = await Promise.all([
+      supabase.from('members').select('*').order('created_at'),
+      supabase.from('tasks').select('*').order('created_at'),
+      supabase.from('task_members').select('*'),
+      supabase.from('completions').select('*')
+        .gte('day', dateKey(dates[0]))
+        .lte('day', dateKey(dates[6]))
+    ]);
 
-  const updateTask = (taskId, patch) =>
-    setData(d => ({
-      ...d,
-      tasks: d.tasks.map(t => (t.id === taskId ? { ...t, ...patch } : t))
-    }));
+    const error = mRes.error || tRes.error || tmRes.error || cRes.error;
+    if (error) {
+      console.error('Could not load data from Supabase:', error);
+      setLoading(false);
+      return;
+    }
 
-  const removeTask = (taskId) =>
-    setData(d => ({ ...d, tasks: d.tasks.filter(t => t.id !== taskId) }));
+    const completions = {};
+    cRes.data.forEach(c => {
+      completions[`${c.day}|${c.task_id}|${c.member_id}`] = c.status;
+    });
 
-  const setCompletion = (dk, taskId, memberId, status) =>
+    setData({
+      members: mRes.data.map(m => ({ id: m.id, name: m.name, avatar: m.avatar })),
+      tasks: tRes.data.map(t => ({
+        id: t.id,
+        name: t.name,
+        points: Number(t.points),
+        frequency: t.frequency,
+        members: tmRes.data.filter(x => x.task_id === t.id).map(x => x.member_id)
+      })),
+      completions
+    });
+    setLoading(false);
+  }, []);
+
+  // Load once, then keep every device in sync.
+  useEffect(() => {
+    if (!online) return undefined;
+
+    fetchAll();
+
+    const channel = supabase
+      .channel('tasktrack-sync')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchAll())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [online, fetchAll]);
+
+  /* ---------- mutations ---------- */
+
+  const addMember = async ({ name, avatar }) => {
+    if (!online) {
+      setData(d => ({ ...d, members: [...d.members, { id: newId(), name, avatar }] }));
+      return;
+    }
+    const { error } = await supabase.from('members').insert({ name, avatar });
+    if (error) return failed('add that member', error);
+    fetchAll();
+  };
+
+  const removeMember = async (memberId) => {
+    if (!online) {
+      setData(d => ({
+        ...d,
+        members: d.members.filter(m => m.id !== memberId),
+        tasks: d.tasks.map(t => ({ ...t, members: t.members.filter(id => id !== memberId) }))
+      }));
+      return;
+    }
+    const { error } = await supabase.from('members').delete().eq('id', memberId);
+    if (error) return failed('remove that member', error);
+    fetchAll();
+  };
+
+  const addTask = async ({ name, points, frequency, members }) => {
+    if (!online) {
+      setData(d => ({ ...d, tasks: [...d.tasks, { id: newId(), name, points, frequency, members }] }));
+      return;
+    }
+    const { data: rows, error } = await supabase
+      .from('tasks')
+      .insert({ name, points, frequency })
+      .select();
+    if (error) return failed('create that task', error);
+
+    if (members.length > 0) {
+      const { error: linkError } = await supabase
+        .from('task_members')
+        .insert(members.map(id => ({ task_id: rows[0].id, member_id: id })));
+      if (linkError) return failed('assign that task', linkError);
+    }
+    fetchAll();
+  };
+
+  const updateTask = async (taskId, patch) => {
+    if (!online) {
+      setData(d => ({ ...d, tasks: d.tasks.map(t => (t.id === taskId ? { ...t, ...patch } : t)) }));
+      return;
+    }
+    const { members, ...fields } = patch;
+
+    if (Object.keys(fields).length > 0) {
+      const { error } = await supabase.from('tasks').update(fields).eq('id', taskId);
+      if (error) return failed('save that task', error);
+    }
+
+    if (members) {
+      const { error } = await supabase.from('task_members').delete().eq('task_id', taskId);
+      if (error) return failed('save that task', error);
+
+      if (members.length > 0) {
+        const { error: linkError } = await supabase
+          .from('task_members')
+          .insert(members.map(id => ({ task_id: taskId, member_id: id })));
+        if (linkError) return failed('save that task', linkError);
+      }
+    }
+    fetchAll();
+  };
+
+  const removeTask = async (taskId) => {
+    if (!online) {
+      setData(d => ({ ...d, tasks: d.tasks.filter(t => t.id !== taskId) }));
+      return;
+    }
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+    if (error) return failed('delete that task', error);
+    fetchAll();
+  };
+
+  const setCompletion = async (dk, taskId, memberId, status) => {
+    // Update on screen straight away, then save.
     setData(d => ({
       ...d,
       completions: { ...d.completions, [`${dk}|${taskId}|${memberId}`]: status }
     }));
+    if (!online) return;
+
+    const { error } = await supabase
+      .from('completions')
+      .upsert(
+        { day: dk, task_id: taskId, member_id: memberId, status, updated_at: new Date().toISOString() },
+        { onConflict: 'day,task_id,member_id' }
+      );
+    if (error) {
+      failed('save that', error);
+      fetchAll();
+    }
+  };
 
   const getCompletion = (dk, taskId, memberId) =>
     data.completions[`${dk}|${taskId}|${memberId}`] || 'incomplete';
 
   const value = {
     data,
+    loading,
+    online,
     addMember,
     removeMember,
     addTask,
