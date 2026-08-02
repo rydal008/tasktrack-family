@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AvatarDisplay } from './Avatars';
 import AddTaskModal from './AddTaskModal';
+import ReviewModal from './ReviewModal';
 import {
   useStore, DAY_NAMES, DAY_SHORT, describeDays, timesPerWeek,
   startOfWeek, weekDates, dayIndexOf, dateKey, formatDate, isSameDay
 } from './store';
 import {
-  uploadEvidence, loadEvidence, deleteEvidence,
-  readVideoDuration, isVideoTooLong, MAX_PHOTOS, MAX_VIDEO_SECONDS
+  uploadEvidence, readVideoDuration, isVideoTooLong, MAX_PHOTOS, MAX_VIDEO_SECONDS
 } from './evidence';
 
 export default function Tracker({ onRequirePIN }) {
@@ -32,10 +32,6 @@ export default function Tracker({ onRequirePIN }) {
 
   // Review modal
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [reviewItems, setReviewItems] = useState([]);
-  const [reviewIndex, setReviewIndex] = useState(0);
-  const [reviewState, setReviewState] = useState('loading'); // loading | ready | error
-  const [busy, setBusy] = useState(false);
 
   const date = dates[dayIndex];
   const dk = dateKey(date);
@@ -85,19 +81,7 @@ export default function Tracker({ onRequirePIN }) {
       setUploadError('');
       setShowUploadModal(true);
     } else if (status === 'pending') {
-      setReviewItems([]);
-      setReviewIndex(0);
-      setReviewState('loading');
       setShowReviewModal(true);
-      loadEvidence(cell.dk, cell.taskId, cell.memberId)
-        .then(items => {
-          setReviewItems(items);
-          setReviewState(items.length > 0 ? 'ready' : 'error');
-        })
-        .catch(err => {
-          console.error(err);
-          setReviewState('error');
-        });
     } else {
       alert('✓✓ Already approved by a parent.');
     }
@@ -182,27 +166,6 @@ export default function Tracker({ onRequirePIN }) {
   const undoCompletion = () => {
     setCompletion(selectedCell.dk, selectedCell.taskId, selectedCell.memberId, 'incomplete');
     closeUpload();
-  };
-
-  const finishReview = async (approved) => {
-    setBusy(true);
-    try {
-      await deleteEvidence(selectedCell.dk, selectedCell.taskId, selectedCell.memberId);
-      setCompletion(
-        selectedCell.dk, selectedCell.taskId, selectedCell.memberId,
-        approved ? 'approved' : 'completed'
-      );
-      setShowReviewModal(false);
-    } catch (err) {
-      console.error(err);
-      alert('Could not finish the review.\n\n' + err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const approveEvidence = () => {
-    onRequirePIN(() => finishReview(true));
   };
 
   const openNewTask = () => {
@@ -455,54 +418,12 @@ export default function Tracker({ onRequirePIN }) {
 
       {/* Parent review */}
       {showReviewModal && (
-        <div className="modal active" onClick={() => !busy && setShowReviewModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">🔍 Review Evidence</div>
-
-            {reviewState === 'loading' && (
-              <div className="carousel-placeholder">Loading…</div>
-            )}
-
-            {reviewState === 'error' && (
-              <div className="carousel-placeholder">
-                No evidence found for this one.
-              </div>
-            )}
-
-            {reviewState === 'ready' && (
-              <>
-                <div className="evidence-stage">
-                  {reviewItems[reviewIndex].kind === 'photo'
-                    ? <img src={reviewItems[reviewIndex].url} alt="Evidence" />
-                    : <video src={reviewItems[reviewIndex].url} controls playsInline />}
-                </div>
-
-                {reviewItems.length > 1 && (
-                  <div className="carousel-nav">
-                    <button
-                      onClick={() => setReviewIndex(reviewIndex - 1)}
-                      disabled={reviewIndex === 0}
-                    >← Prev</button>
-                    <span className="task-meta">{reviewIndex + 1} of {reviewItems.length}</span>
-                    <button
-                      onClick={() => setReviewIndex(reviewIndex + 1)}
-                      disabled={reviewIndex === reviewItems.length - 1}
-                    >Next →</button>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => finishReview(false)} disabled={busy}>
-                Not OK
-              </button>
-              <button className="btn-confirm" onClick={approveEvidence} disabled={busy || reviewState !== 'ready'}>
-                {busy ? 'Working…' : 'OK ✓'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ReviewModal
+          cell={{ ...selectedCell, dayLabel: DAY_NAMES[dayIndex] }}
+          onRequirePIN={onRequirePIN}
+          onFinished={() => setShowReviewModal(false)}
+          onClose={() => setShowReviewModal(false)}
+        />
       )}
     </div>
   );

@@ -4,12 +4,16 @@ import Leaderboard from './Leaderboard';
 import Tracker from './Tracker';
 import Settings from './Settings';
 import PINModal from './PINModal';
-import { StoreProvider } from './store';
+import Review, { pendingQueue } from './Review';
+import { useStore } from './store';
 
 // How long one PIN entry keeps approving unlocked for.
 const PARENT_UNLOCK_MINUTES = 15;
 
 function App() {
+  const { data } = useStore();
+  const waitingCount = pendingQueue(data).length;
+
   const [currentPage, setCurrentPage] = useState('leaderboard');
   const [darkMode, setDarkMode] = useState(false);
   const [appTitle, setAppTitle] = useState('TaskTrack');
@@ -92,7 +96,6 @@ function App() {
   };
 
   return (
-    <StoreProvider>
     <div className="container">
       {/* Header */}
       <div className="header">
@@ -114,6 +117,7 @@ function App() {
       <div className="content">
         {currentPage === 'leaderboard' && <Leaderboard />}
         {currentPage === 'tracker' && <Tracker onRequirePIN={handleRequirePIN} />}
+        {currentPage === 'review' && <Review onRequirePIN={handleRequirePIN} />}
         {currentPage === 'settings' && <Settings onUpdateTitle={updateAppTitle} />}
       </div>
 
@@ -131,7 +135,14 @@ function App() {
         >
           ✓ Tasks
         </button>
-        <button 
+        <button
+          className={`nav-tab ${currentPage === 'review' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('review')}
+        >
+          ⏳ Review
+          {waitingCount > 0 && <span className="nav-badge">{waitingCount}</span>}
+        </button>
+        <button
           className={`nav-tab ${currentPage === 'settings' ? 'active' : ''}`}
           onClick={() => setCurrentPage('settings')}
         >
@@ -147,7 +158,6 @@ function App() {
         />
       )}
     </div>
-    </StoreProvider>
   );
 }
 

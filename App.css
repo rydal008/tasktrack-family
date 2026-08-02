@@ -127,15 +127,31 @@ body.dark-mode .nav-bar {
 
 .nav-tab {
   flex: 1;
-  padding: 12px;
+  padding: 12px 4px;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: #86868b;
   transition: color 0.2s;
   border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+
+.nav-badge {
+  display: inline-block;
+  min-width: 17px;
+  margin-left: 4px;
+  padding: 1px 4px;
+  border-radius: 9px;
+  background-color: #FF9500;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  vertical-align: text-top;
 }
 
 body.dark-mode .nav-tab {
@@ -1129,6 +1145,36 @@ body.dark-mode .task-meta {
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+}
+
+/* Review queue */
+.queue-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background-color: #f5f5f7;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+body.dark-mode .queue-row {
+  background-color: #424245;
+}
+
+.queue-row:active {
+  transform: scale(0.99);
+}
+
+.queue-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-title {
+  font-size: 14px;
+  font-weight: 600;
 }
 
 /* Proof choice */
