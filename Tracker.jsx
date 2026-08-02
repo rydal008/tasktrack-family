@@ -283,7 +283,8 @@ export default function Tracker({ onRequirePIN }) {
                         <AvatarDisplay avatarId={member.avatar} size={28} />
                       </div>
                       <span className="member-name">{member.name}</span>
-                      <div className={`check-icon ${status}`}>{getCheckIcon(status)}</div>
+                      {/* keyed on status so the mark re-animates on every change */}
+                      <div key={status} className={`check-icon ${status}`}>{getCheckIcon(status)}</div>
                     </div>
                   );
                 })}

@@ -154,7 +154,7 @@ function App() {
           onClick={() => setCurrentPage('review')}
         >
           ⏳ Review
-          {waitingCount > 0 && <span className="nav-badge">{waitingCount}</span>}
+          {waitingCount > 0 && <span key={waitingCount} className="nav-badge">{waitingCount}</span>}
         </button>
         <button
           className={`nav-tab ${currentPage === 'settings' ? 'active' : ''}`}
