@@ -119,7 +119,8 @@ function loadLocal() {
       tasks: (parsed.tasks || []).map(t => ({
         ...t,
         members: t.members || [],
-        days: t.days || ALL_DAYS
+        days: t.days || ALL_DAYS,
+        requiresEvidence: t.requiresEvidence !== false
       })),
       completions: parsed.completions || {}
     };
@@ -189,6 +190,7 @@ export function StoreProvider({ children }) {
         name: t.name,
         points: Number(t.points),
         days: sortDays((t.days || ALL_DAYS).map(Number)),
+        requiresEvidence: t.requires_evidence !== false,
         members: tmRes.data.filter(x => x.task_id === t.id).map(x => x.member_id)
       })),
       completions
@@ -261,14 +263,17 @@ export function StoreProvider({ children }) {
     fetchAll();
   };
 
-  const addTask = async ({ name, points, days, members }) => {
+  const addTask = async ({ name, points, days, requiresEvidence, members }) => {
     if (!online) {
-      setData(d => ({ ...d, tasks: [...d.tasks, { id: newId(), name, points, days, members }] }));
+      setData(d => ({
+        ...d,
+        tasks: [...d.tasks, { id: newId(), name, points, days, requiresEvidence, members }]
+      }));
       return;
     }
     const { data: rows, error } = await supabase
       .from('tasks')
-      .insert({ name, points, days })
+      .insert({ name, points, days, requires_evidence: requiresEvidence })
       .select();
     if (error) return failed('create that task', error);
 
@@ -286,7 +291,9 @@ export function StoreProvider({ children }) {
       setData(d => ({ ...d, tasks: d.tasks.map(t => (t.id === taskId ? { ...t, ...patch } : t)) }));
       return;
     }
-    const { members, ...fields } = patch;
+    const { members, requiresEvidence, ...rest } = patch;
+    const fields = { ...rest };
+    if (requiresEvidence !== undefined) fields.requires_evidence = requiresEvidence;
 
     if (Object.keys(fields).length > 0) {
       const { error } = await supabase.from('tasks').update(fields).eq('id', taskId);

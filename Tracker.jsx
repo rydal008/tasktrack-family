@@ -71,6 +71,13 @@ export default function Tracker({ onRequirePIN }) {
     const cell = { dk, taskId: task.id, memberId: member.id, taskName: task.name, memberName: member.name };
     setSelectedCell(cell);
 
+    // Chores set to "just tick it off" have no evidence and no review, so the
+    // check simply toggles and the points count immediately.
+    if (task.requiresEvidence === false) {
+      setCompletion(dk, task.id, member.id, status === 'approved' ? 'incomplete' : 'approved');
+      return;
+    }
+
     if (status === 'incomplete') {
       setCompletion(dk, task.id, member.id, 'completed');
     } else if (status === 'completed') {
@@ -284,7 +291,10 @@ export default function Tracker({ onRequirePIN }) {
               <div className="task-header">
                 <div className="task-title-wrap">
                   <h3>{task.name}</h3>
-                  <div className="task-meta">{describeDays(task.days)} · {timesPerWeek(task.days)}</div>
+                  <div className="task-meta">
+                    {describeDays(task.days)} · {timesPerWeek(task.days)}
+                    {task.requiresEvidence === false ? ' · no photo' : ''}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span className="task-points">{task.points} pts</span>

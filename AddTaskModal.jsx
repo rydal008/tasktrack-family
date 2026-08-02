@@ -6,6 +6,7 @@ export default function AddTaskModal({ members, task, onSave, onDelete, onClose 
   const [name, setName] = useState(task ? task.name : '');
   const [points, setPoints] = useState(task ? String(task.points) : '1');
   const [days, setDays] = useState(task ? task.days : ALL_DAYS);
+  const [requiresEvidence, setRequiresEvidence] = useState(task ? task.requiresEvidence !== false : true);
   const [selectedMembers, setSelectedMembers] = useState(task ? task.members : []);
   const [error, setError] = useState('');
 
@@ -45,6 +46,7 @@ export default function AddTaskModal({ members, task, onSave, onDelete, onClose 
       name: name.trim(),
       points: pointsNum,
       days: sortDays(days),
+      requiresEvidence,
       members: selectedMembers
     });
   };
@@ -100,6 +102,28 @@ export default function AddTaskModal({ members, task, onSave, onDelete, onClose 
 
             <div className="task-meta" style={{ marginTop: '8px' }}>
               {days.length > 0 ? timesPerWeek(days) : 'No days chosen yet'}
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">Proof</label>
+            <div className="proof-choice">
+              <button
+                type="button"
+                className={`proof-option${requiresEvidence ? ' on' : ''}`}
+                onClick={() => setRequiresEvidence(true)}
+              >
+                <span className="freq-label">📸 Photo needed</span>
+                <span className="freq-sub">A parent checks it before points count</span>
+              </button>
+              <button
+                type="button"
+                className={`proof-option${!requiresEvidence ? ' on' : ''}`}
+                onClick={() => setRequiresEvidence(false)}
+              >
+                <span className="freq-label">✓ Just tick it off</span>
+                <span className="freq-sub">Points count straight away, nothing to review</span>
+              </button>
             </div>
           </div>
 

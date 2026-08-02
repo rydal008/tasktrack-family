@@ -6,12 +6,17 @@ import Settings from './Settings';
 import PINModal from './PINModal';
 import { StoreProvider } from './store';
 
+// How long one PIN entry keeps approving unlocked for.
+const PARENT_UNLOCK_MINUTES = 15;
+
 function App() {
   const [currentPage, setCurrentPage] = useState('leaderboard');
   const [darkMode, setDarkMode] = useState(false);
   const [appTitle, setAppTitle] = useState('TaskTrack');
   const [showPINModal, setShowPINModal] = useState(false);
   const [pinCallback, setPinCallback] = useState(null);
+  // Kept in memory only: reloading the page locks it again.
+  const [unlockedUntil, setUnlockedUntil] = useState(0);
 
   useEffect(() => {
     // Load dark mode preference
@@ -48,18 +53,38 @@ function App() {
     localStorage.setItem('appTitle', fullTitle);
   };
 
+  // Approving forty chores should not mean typing the PIN forty times.
   const handleRequirePIN = (callback) => {
+    if (Date.now() < unlockedUntil) {
+      callback();
+      return;
+    }
     setPinCallback(() => callback);
     setShowPINModal(true);
   };
 
   const handlePINSuccess = () => {
+    setUnlockedUntil(Date.now() + PARENT_UNLOCK_MINUTES * 60 * 1000);
     if (pinCallback) {
       pinCallback();
     }
     setShowPINModal(false);
     setPinCallback(null);
   };
+
+  const lockParentMode = () => setUnlockedUntil(0);
+
+  // Re-lock on its own so the badge cannot linger after it has expired.
+  useEffect(() => {
+    if (!unlockedUntil) return undefined;
+    const remaining = unlockedUntil - Date.now();
+    if (remaining <= 0) {
+      setUnlockedUntil(0);
+      return undefined;
+    }
+    const timer = setTimeout(() => setUnlockedUntil(0), remaining);
+    return () => clearTimeout(timer);
+  }, [unlockedUntil]);
 
   const handlePINCancel = () => {
     setShowPINModal(false);
@@ -73,6 +98,13 @@ function App() {
       <div className="header">
         <h1>{appTitle}</h1>
         <div className="header-right">
+          {unlockedUntil > 0 && (
+            <button
+              className="theme-btn"
+              onClick={lockParentMode}
+              title={`Parent mode on for ${PARENT_UNLOCK_MINUTES} minutes — tap to lock now`}
+            >🔓</button>
+          )}
           <div className="credit">by rydal</div>
           <button className="theme-btn" onClick={toggleDarkMode}>{darkMode ? '☀️' : '🌙'}</button>
         </div>
