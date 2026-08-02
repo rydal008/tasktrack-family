@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
+import { cleanupOldEvidence, purgeEvidenceFor } from './evidence';
 
 // Single source of truth for members, tasks and completions.
 // Uses Supabase when it is configured, otherwise falls back to this browser's
@@ -176,6 +177,11 @@ export function StoreProvider({ children }) {
 
     fetchAll();
 
+    // Sweep away evidence from earlier weeks. Never let this break start-up.
+    cleanupOldEvidence(dateKey(startOfWeek()))
+      .then(count => { if (count > 0) console.info(`Cleared ${count} old evidence file(s).`); })
+      .catch(err => console.warn('Evidence cleanup skipped.', err));
+
     const channel = supabase
       .channel('tasktrack-sync')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchAll())
@@ -205,6 +211,13 @@ export function StoreProvider({ children }) {
       }));
       return;
     }
+    // Clear their photos before the rows pointing at them cascade away.
+    try {
+      await purgeEvidenceFor('member_id', memberId);
+    } catch (err) {
+      console.warn('Could not clear that member\'s evidence files.', err);
+    }
+
     const { error } = await supabase.from('members').delete().eq('id', memberId);
     if (error) return failed('remove that member', error);
     fetchAll();
@@ -261,6 +274,12 @@ export function StoreProvider({ children }) {
       setData(d => ({ ...d, tasks: d.tasks.filter(t => t.id !== taskId) }));
       return;
     }
+    try {
+      await purgeEvidenceFor('task_id', taskId);
+    } catch (err) {
+      console.warn('Could not clear that task\'s evidence files.', err);
+    }
+
     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
     if (error) return failed('delete that task', error);
     fetchAll();
