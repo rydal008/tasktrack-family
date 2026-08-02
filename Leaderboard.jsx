@@ -6,8 +6,9 @@ import {
 } from './store';
 
 export default function Leaderboard() {
-  const { data, loading, addMember, removeMember } = useStore();
-  const [showAddMember, setShowAddMember] = useState(false);
+  const { data, loading, addMember, updateMember, removeMember } = useStore();
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
 
   const today = new Date();
   const weekStart = startOfWeek(today);
@@ -46,9 +47,32 @@ export default function Leaderboard() {
     return 'linear-gradient(90deg, #d70015, #FF9500)';
   };
 
-  const handleRemove = (member) => {
-    if (window.confirm(`Remove ${member.name} from the family list?`)) {
-      removeMember(member.id);
+  const openAddMember = () => {
+    setEditingMember(null);
+    setShowMemberModal(true);
+  };
+
+  const openEditMember = (member) => {
+    setEditingMember(member);
+    setShowMemberModal(true);
+  };
+
+  const handleSaveMember = (fields) => {
+    if (editingMember) {
+      updateMember(editingMember.id, fields);
+    } else {
+      addMember(fields);
+    }
+    setShowMemberModal(false);
+  };
+
+  const handleRemoveMember = () => {
+    const message =
+      `Remove ${editingMember.name}? Their points and history go too.\n\n` +
+      'To only fix a spelling, press Cancel and edit the name instead.';
+    if (window.confirm(message)) {
+      removeMember(editingMember.id);
+      setShowMemberModal(false);
     }
   };
 
@@ -67,7 +91,7 @@ export default function Leaderboard() {
             {daysLeft === 1 ? 'Last day of the cycle' : `Resets in ${daysLeft} days`}
           </div>
         </div>
-        <button className="btn-add-member" onClick={() => setShowAddMember(true)}>+ Add Member</button>
+        <button className="btn-add-member" onClick={openAddMember}>+ Add Member</button>
       </div>
 
       {/* Leaderboard */}
@@ -107,7 +131,7 @@ export default function Leaderboard() {
                     <div className="score-value">{member.score.toFixed(1)}</div>
                     <div className="score-max">/ {member.maxScore.toFixed(1)}</div>
                   </div>
-                  <button className="btn-remove" onClick={() => handleRemove(member)} aria-label="Remove member">✕</button>
+                  <button className="btn-edit" onClick={() => openEditMember(member)} aria-label="Edit member">✎</button>
                 </div>
               </div>
             );
@@ -127,14 +151,13 @@ export default function Leaderboard() {
         </div>
       </div>
 
-      {/* Add Member Modal */}
-      {showAddMember && (
+      {/* Add / Edit Member */}
+      {showMemberModal && (
         <AddMemberModal
-          onAdd={(member) => {
-            addMember(member);
-            setShowAddMember(false);
-          }}
-          onCancel={() => setShowAddMember(false)}
+          member={editingMember}
+          onSave={handleSaveMember}
+          onDelete={editingMember ? handleRemoveMember : null}
+          onCancel={() => setShowMemberModal(false)}
         />
       )}
     </div>

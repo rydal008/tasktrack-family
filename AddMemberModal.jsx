@@ -1,72 +1,69 @@
 import React, { useState } from 'react';
 import AvatarPicker from './AvatarPicker';
 
-export default function AddMemberModal({ onAdd, onCancel }) {
-  const [name, setName] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState('avatar-1');
+const MAX_NAME = 3;
 
-  const handleAdd = () => {
-    if (name.trim() && name.length <= 3) {
-      onAdd({
-        name: name.trim(),
-        avatar: selectedAvatar
-      });
-      setName('');
-      setSelectedAvatar('avatar-1');
-    }
+export default function AddMemberModal({ member, onSave, onDelete, onCancel }) {
+  const [name, setName] = useState(member ? member.name : '');
+  const [avatar, setAvatar] = useState(member ? member.avatar : 'avatar-1');
+
+  const trimmed = name.trim();
+  const canSave = trimmed.length > 0 && trimmed.length <= MAX_NAME;
+
+  const handleSave = () => {
+    if (!canSave) return;
+    onSave({ name: trimmed, avatar });
   };
 
   return (
     <div className="modal active" onClick={onCancel}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">👤 Add Family Member</div>
-        
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{
-            display: 'block',
-            fontSize: '12px',
-            fontWeight: '600',
-            textTransform: 'uppercase',
-            color: '#86868b',
-            marginBottom: '8px',
-            letterSpacing: '0.5px'
-          }}>
-            Name (max 3 characters)
-          </label>
+        <div className="modal-title">
+          {member ? '✏️ Edit Family Member' : '👤 Add Family Member'}
+        </div>
+
+        {member && (
+          <div className="modal-body">
+            Renaming keeps every point they have already earned.
+          </div>
+        )}
+
+        <div className="input-group">
+          <label className="input-label">Name (max {MAX_NAME} characters)</label>
           <input
             type="text"
-            maxLength="3"
+            maxLength={MAX_NAME}
             placeholder="e.g., Alx"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="settings-input"
-            style={{ width: '100%', marginBottom: '8px' }}
+            style={{ width: '100%' }}
             autoFocus
           />
-          <div style={{
-            fontSize: '11px',
-            color: '#86868b'
-          }}>
-            {name.length}/3 characters
+          <div className="task-meta" style={{ marginTop: '6px' }}>
+            {trimmed.length}/{MAX_NAME} characters
           </div>
         </div>
 
-        <AvatarPicker 
-          selectedAvatar={selectedAvatar}
-          onSelect={setSelectedAvatar}
-        />
+        <AvatarPicker selectedAvatar={avatar} onSelect={setAvatar} />
 
         <div className="modal-actions">
           <button className="btn-cancel" onClick={onCancel}>Cancel</button>
-          <button 
-            className="btn-confirm" 
-            onClick={handleAdd}
-            disabled={!name.trim() || name.length > 3}
-            style={{ opacity: (!name.trim() || name.length > 3) ? 0.5 : 1 }}
+          <button
+            className="btn-confirm"
+            onClick={handleSave}
+            disabled={!canSave}
+            style={{ opacity: canSave ? 1 : 0.5 }}
           >
-            Add Member
+            {member ? 'Save' : 'Add Member'}
           </button>
         </div>
+
+        {onDelete && (
+          <button type="button" className="btn-danger" onClick={onDelete}>
+            Remove this member
+          </button>
+        )}
       </div>
     </div>
   );

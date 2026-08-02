@@ -202,6 +202,19 @@ export function StoreProvider({ children }) {
     fetchAll();
   };
 
+  const updateMember = async (memberId, patch) => {
+    if (!online) {
+      setData(d => ({
+        ...d,
+        members: d.members.map(m => (m.id === memberId ? { ...m, ...patch } : m))
+      }));
+      return;
+    }
+    const { error } = await supabase.from('members').update(patch).eq('id', memberId);
+    if (error) return failed('save that member', error);
+    fetchAll();
+  };
+
   const removeMember = async (memberId) => {
     if (!online) {
       setData(d => ({
@@ -313,6 +326,7 @@ export function StoreProvider({ children }) {
     loading,
     online,
     addMember,
+    updateMember,
     removeMember,
     addTask,
     updateTask,
