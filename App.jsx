@@ -74,7 +74,7 @@ function App() {
         <h1>{appTitle}</h1>
         <div className="header-right">
           <div className="credit">by rydal</div>
-          <button className="theme-btn" onClick={toggleDarkMode}>🌙</button>
+          <button className="theme-btn" onClick={toggleDarkMode}>{darkMode ? '☀️' : '🌙'}</button>
         </div>
       </div>
 

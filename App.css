@@ -20,6 +20,7 @@ body.dark-mode {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh; /* phone browsers shrink the viewport as their chrome slides away */
   max-width: 480px;
   margin: 0 auto;
   background-color: #ffffff;
@@ -36,6 +37,8 @@ body.dark-mode .container {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
+  /* Clear the notch when running from the home screen. */
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
   border-bottom: 1px solid #e5e5e7;
   transition: border-bottom-color 0.3s;
 }
@@ -112,6 +115,8 @@ body.dark-mode .content {
   display: flex;
   border-top: 1px solid #e5e5e7;
   background-color: #ffffff;
+  /* Keep the tabs above the iPhone home indicator. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   transition: background-color 0.3s, border-top-color 0.3s;
 }
 
