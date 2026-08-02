@@ -343,6 +343,34 @@ export function StoreProvider({ children }) {
     }
   };
 
+  // Completions for any week, so past cycles can be looked back at. The store
+  // itself only ever holds the current week.
+  const loadWeek = useCallback(async (weekStart) => {
+    const dates = weekDates(weekStart);
+    const from = dateKey(dates[0]);
+    const to = dateKey(dates[6]);
+
+    if (!online) {
+      const found = {};
+      Object.entries(data.completions).forEach(([key, status]) => {
+        const day = key.split('|')[0];
+        if (day >= from && day <= to) found[key] = status;
+      });
+      return found;
+    }
+
+    const { data: rows, error } = await supabase
+      .from('completions')
+      .select('*')
+      .gte('day', from)
+      .lte('day', to);
+    if (error) throw error;
+
+    const found = {};
+    rows.forEach(c => { found[`${c.day}|${c.task_id}|${c.member_id}`] = c.status; });
+    return found;
+  }, [online, data.completions]);
+
   const getCompletion = (dk, taskId, memberId) =>
     data.completions[`${dk}|${taskId}|${memberId}`] || 'incomplete';
 
@@ -357,7 +385,8 @@ export function StoreProvider({ children }) {
     updateTask,
     removeTask,
     setCompletion,
-    getCompletion
+    getCompletion,
+    loadWeek
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

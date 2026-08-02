@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AvatarDisplay } from './Avatars';
 import AddMemberModal from './AddMemberModal';
 import {
@@ -6,18 +6,60 @@ import {
 } from './store';
 
 export default function Leaderboard() {
-  const { data, loading, addMember, updateMember, removeMember } = useStore();
+  const { data, loading, addMember, updateMember, removeMember, loadWeek } = useStore();
+
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
 
+  // 0 is this week, -1 last week, and so on.
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [pastCompletions, setPastCompletions] = useState(null);
+  const [loadingWeek, setLoadingWeek] = useState(false);
+  const [weekError, setWeekError] = useState('');
+
   const today = new Date();
-  const weekStart = startOfWeek(today);
+  const isCurrentWeek = weekOffset === 0;
+
+  const weekStart = useMemo(() => {
+    const start = startOfWeek(today);
+    start.setDate(start.getDate() + weekOffset * 7);
+    return start;
+  }, [weekOffset]);
+
   const dates = weekDates(weekStart);
   const daysLeft = 7 - dayIndexOf(today);
 
+  useEffect(() => {
+    if (isCurrentWeek) {
+      setPastCompletions(null);
+      setWeekError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoadingWeek(true);
+    setWeekError('');
+
+    loadWeek(weekStart)
+      .then(found => { if (!cancelled) setPastCompletions(found); })
+      .catch(err => {
+        console.error(err);
+        if (!cancelled) setWeekError('Could not load that week.');
+      })
+      .finally(() => { if (!cancelled) setLoadingWeek(false); });
+
+    return () => { cancelled = true; };
+  }, [weekOffset]);
+
+  // Past weeks are scored against the completions of that week, but against
+  // today's chore list — there is no history of what the chores used to be.
+  const scoringData = isCurrentWeek
+    ? data
+    : { ...data, completions: pastCompletions || {} };
+
   const scores = data.members
     .map(member => {
-      const { earned, possible } = scoreForWeek(data, member.id, weekStart);
+      const { earned, possible } = scoreForWeek(scoringData, member.id, weekStart);
       return { ...member, score: earned, maxScore: possible };
     })
     .sort((a, b) => b.score - a.score)
@@ -45,6 +87,12 @@ export default function Leaderboard() {
     if (percentage >= 80) return 'linear-gradient(90deg, #0071e3, #34c759)';
     if (percentage >= 60) return 'linear-gradient(90deg, #0071e3, #FF9500)';
     return 'linear-gradient(90deg, #d70015, #FF9500)';
+  };
+
+  const weekLabel = () => {
+    if (weekOffset === 0) return 'This week · Mon–Sun';
+    if (weekOffset === -1) return 'Last week';
+    return `${Math.abs(weekOffset)} weeks ago`;
   };
 
   const openAddMember = () => {
@@ -77,25 +125,49 @@ export default function Leaderboard() {
   };
 
   const topScore = scores.length > 0 ? Math.max(...scores.map(s => s.score)) : 0;
+  const busy = loading || loadingWeek;
 
   return (
     <div className="page">
-      {/* Cycle info — one full week, Monday to Sunday */}
+      {/* Which week */}
       <div className="cycle-info">
-        <div className="cycle-left">
-          <div className="cycle-label">This Week · Mon–Sun</div>
+        <button
+          className="week-arrow"
+          onClick={() => setWeekOffset(weekOffset - 1)}
+          aria-label="Previous week"
+        >◀</button>
+
+        <div className="cycle-left" style={{ flex: 1, textAlign: 'center' }}>
+          <div className="cycle-label">{weekLabel()}</div>
           <div className="cycle-countdown">
             {formatDate(dates[0])} – {formatDate(dates[6])}
           </div>
           <div className="task-meta">
-            {daysLeft === 1 ? 'Last day of the cycle' : `Resets in ${daysLeft} days`}
+            {isCurrentWeek
+              ? (daysLeft === 1 ? 'Last day of the cycle' : `Resets in ${daysLeft} days`)
+              : 'Finished'}
           </div>
         </div>
-        <button className="btn-add-member" onClick={openAddMember}>+ Add Member</button>
+
+        <button
+          className="week-arrow"
+          onClick={() => setWeekOffset(weekOffset + 1)}
+          disabled={isCurrentWeek}
+          aria-label="Next week"
+        >▶</button>
       </div>
 
-      {/* Leaderboard */}
-      {loading ? (
+      {isCurrentWeek && (
+        <div className="section-actions">
+          <div className="summary-title" style={{ marginBottom: 0 }}>Rankings</div>
+          <button className="btn-add" onClick={openAddMember}>+ Add Member</button>
+        </div>
+      )}
+
+      {weekError && <div className="error-message">{weekError}</div>}
+
+      {/* Rankings */}
+      {busy ? (
         <div className="empty-state"><p>Loading…</p></div>
       ) : scores.length === 0 ? (
         <div className="empty-state">
@@ -131,11 +203,20 @@ export default function Leaderboard() {
                     <div className="score-value">{member.score.toFixed(1)}</div>
                     <div className="score-max">/ {member.maxScore.toFixed(1)}</div>
                   </div>
-                  <button className="btn-edit" onClick={() => openEditMember(member)} aria-label="Edit member">✎</button>
+                  {isCurrentWeek && (
+                    <button className="btn-edit" onClick={() => openEditMember(member)} aria-label="Edit member">✎</button>
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!isCurrentWeek && !busy && scores.length > 0 && (
+        <div className="task-meta" style={{ marginBottom: '16px' }}>
+          Totals are worked out from today’s chore list, so they shift if you
+          change who does what.
         </div>
       )}
 

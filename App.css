@@ -201,6 +201,29 @@ body.dark-mode .cycle-label {
   cursor: pointer;
 }
 
+.week-arrow {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #1d1d1f;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+body.dark-mode .week-arrow {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #f5f5f7;
+}
+
+.week-arrow:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
 .leaderboard {
   display: flex;
   flex-direction: column;
