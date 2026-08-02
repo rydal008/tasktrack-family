@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AvatarDisplay } from './Avatars';
 import AddTaskModal from './AddTaskModal';
 import {
-  useStore, DAY_NAMES, DAY_SHORT, getFrequency,
+  useStore, DAY_NAMES, DAY_SHORT, describeDays, timesPerWeek,
   startOfWeek, weekDates, dayIndexOf, dateKey, formatDate, isSameDay
 } from './store';
 import {
@@ -41,9 +41,7 @@ export default function Tracker({ onRequirePIN }) {
   const dk = dateKey(date);
   const isToday = isSameDay(date, today);
 
-  const tasksToday = data.tasks.filter(task =>
-    getFrequency(task.frequency).days.includes(dayIndex)
-  );
+  const tasksToday = data.tasks.filter(task => task.days.includes(dayIndex));
 
   // Local preview URLs have to be released by hand, but only once we are
   // actually finished with them — never on every change to `picked`.
@@ -286,7 +284,7 @@ export default function Tracker({ onRequirePIN }) {
               <div className="task-header">
                 <div className="task-title-wrap">
                   <h3>{task.name}</h3>
-                  <div className="task-meta">{getFrequency(task.frequency).label} · {getFrequency(task.frequency).sub}</div>
+                  <div className="task-meta">{describeDays(task.days)} · {timesPerWeek(task.days)}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span className="task-points">{task.points} pts</span>

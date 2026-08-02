@@ -1108,56 +1108,72 @@ body.dark-mode .task-meta {
   font-family: inherit;
 }
 
-/* Frequency picker */
-.freq-grid {
+/* Day picker */
+.day-picker {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
 }
 
-.freq-option {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px;
+.day-toggle {
+  padding: 10px 2px;
   border: 2px solid #e5e5e7;
   border-radius: 8px;
   background-color: white;
+  font-size: 11px;
+  font-weight: 600;
+  color: #86868b;
   cursor: pointer;
-  text-align: left;
   font-family: inherit;
-  color: inherit;
-  transition: border-color 0.2s, background-color 0.2s;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
 }
 
-body.dark-mode .freq-option {
+body.dark-mode .day-toggle {
+  background-color: #424245;
+  border-color: #424245;
+  color: #a1a1a6;
+}
+
+.day-toggle.on {
+  border-color: #0071e3;
+  background-color: #0071e3;
+  color: #ffffff;
+}
+
+.preset-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.preset-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid #e5e5e7;
+  border-radius: 6px;
+  background-color: #f5f5f7;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1d1d1f;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+body.dark-mode .preset-btn {
   background-color: #424245;
   border-color: #424245;
   color: #f5f5f7;
 }
 
-.freq-option.selected {
+.preset-btn.on {
   border-color: #0071e3;
+  color: #0071e3;
   background-color: #f0f6ff;
 }
 
-body.dark-mode .freq-option.selected {
+body.dark-mode .preset-btn.on {
   background-color: rgba(0, 113, 227, 0.15);
-  border-color: #0071e3;
-}
-
-.freq-label {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.freq-sub {
-  font-size: 11px;
-  color: #86868b;
-}
-
-body.dark-mode .freq-sub {
-  color: #a1a1a6;
+  color: #ffffff;
 }
 
 /* Member checkboxes */

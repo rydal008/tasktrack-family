@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { AvatarDisplay } from './Avatars';
-import { FREQUENCIES } from './store';
+import { DAY_PRESETS, DAY_SHORT, ALL_DAYS, sortDays, sameDays, timesPerWeek } from './store';
 
 export default function AddTaskModal({ members, task, onSave, onDelete, onClose }) {
   const [name, setName] = useState(task ? task.name : '');
   const [points, setPoints] = useState(task ? String(task.points) : '1');
-  const [frequency, setFrequency] = useState(task ? task.frequency : 'daily');
+  const [days, setDays] = useState(task ? task.days : ALL_DAYS);
   const [selectedMembers, setSelectedMembers] = useState(task ? task.members : []);
   const [error, setError] = useState('');
+
+  const toggleDay = (day) => {
+    setError('');
+    setDays(days.includes(day) ? days.filter(d => d !== day) : sortDays([...days, day]));
+  };
 
   const toggleMember = (memberId) => {
     setSelectedMembers(prev =>
@@ -20,6 +25,10 @@ export default function AddTaskModal({ members, task, onSave, onDelete, onClose 
 
     if (!name.trim()) {
       setError('Give the task a name.');
+      return;
+    }
+    if (days.length === 0) {
+      setError('Pick at least one day.');
       return;
     }
     if (selectedMembers.length === 0) {
@@ -35,7 +44,7 @@ export default function AddTaskModal({ members, task, onSave, onDelete, onClose 
     onSave({
       name: name.trim(),
       points: pointsNum,
-      frequency,
+      days: sortDays(days),
       members: selectedMembers
     });
   };
@@ -60,19 +69,37 @@ export default function AddTaskModal({ members, task, onSave, onDelete, onClose 
           </div>
 
           <div className="input-group">
-            <label className="input-label">How often?</label>
-            <div className="freq-grid">
-              {FREQUENCIES.map(f => (
+            <label className="input-label">Which days?</label>
+
+            <div className="day-picker">
+              {ALL_DAYS.map(day => (
                 <button
                   type="button"
-                  key={f.id}
-                  className={`freq-option${frequency === f.id ? ' selected' : ''}`}
-                  onClick={() => setFrequency(f.id)}
+                  key={day}
+                  className={`day-toggle${days.includes(day) ? ' on' : ''}`}
+                  onClick={() => toggleDay(day)}
+                  aria-pressed={days.includes(day)}
                 >
-                  <span className="freq-label">{f.label}</span>
-                  <span className="freq-sub">{f.sub}</span>
+                  {DAY_SHORT[day]}
                 </button>
               ))}
+            </div>
+
+            <div className="preset-row">
+              {DAY_PRESETS.map(preset => (
+                <button
+                  type="button"
+                  key={preset.id}
+                  className={`preset-btn${sameDays(preset.days, days) ? ' on' : ''}`}
+                  onClick={() => { setError(''); setDays(preset.days); }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="task-meta" style={{ marginTop: '8px' }}>
+              {days.length > 0 ? timesPerWeek(days) : 'No days chosen yet'}
             </div>
           </div>
 

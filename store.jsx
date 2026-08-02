@@ -11,16 +11,37 @@ const STORAGE_KEY = 'tasktrack.data.v1';
 export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// Day numbers below are Monday = 0 ... Sunday = 6
-export const FREQUENCIES = [
-  { id: 'daily', label: 'Daily',     sub: 'Every day',       days: [0, 1, 2, 3, 4, 5, 6] },
-  { id: '5x',    label: '5x / week', sub: 'Mon to Fri',      days: [0, 1, 2, 3, 4] },
-  { id: '3x',    label: '3x / week', sub: 'Mon, Wed, Fri',   days: [0, 2, 4] },
-  { id: '2x',    label: '2x / week', sub: 'Tue, Thu',        days: [1, 3] }
+// Day numbers throughout are Monday = 0 ... Sunday = 6
+export const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+// Shortcuts in the task editor. Any other combination is picked day by day.
+export const DAY_PRESETS = [
+  { id: 'daily',    label: 'Every day', days: ALL_DAYS },
+  { id: 'weekdays', label: 'Weekdays',  days: [0, 1, 2, 3, 4] },
+  { id: 'weekend',  label: 'Weekend',   days: [5, 6] }
 ];
 
-export function getFrequency(id) {
-  return FREQUENCIES.find(f => f.id === id) || FREQUENCIES[0];
+export function sortDays(days) {
+  return [...new Set(days)].sort((a, b) => a - b);
+}
+
+export function sameDays(a, b) {
+  return sortDays(a).join(',') === sortDays(b).join(',');
+}
+
+export function describeDays(days) {
+  const sorted = sortDays(days);
+  if (sorted.length === 0) return 'No days chosen';
+
+  const preset = DAY_PRESETS.find(p => sameDays(p.days, sorted));
+  if (preset) return preset.label;
+
+  return sorted.map(d => DAY_SHORT[d]).join(', ');
+}
+
+export function timesPerWeek(days) {
+  const count = sortDays(days).length;
+  return count === 1 ? 'once a week' : `${count}x a week`;
 }
 
 /* ---------- dates: the cycle is one full week, Monday to Sunday ---------- */
@@ -72,7 +93,7 @@ export function scoreForWeek(data, memberId, weekStart) {
 
     data.tasks.forEach(task => {
       if (!task.members.includes(memberId)) return;
-      if (!getFrequency(task.frequency).days.includes(di)) return;
+      if (!task.days.includes(di)) return;
 
       possible += task.points;
       if (data.completions[`${dk}|${task.id}|${memberId}`] === 'approved') {
@@ -95,7 +116,11 @@ function loadLocal() {
     const parsed = JSON.parse(raw);
     return {
       members: parsed.members || [],
-      tasks: (parsed.tasks || []).map(t => ({ ...t, members: t.members || [] })),
+      tasks: (parsed.tasks || []).map(t => ({
+        ...t,
+        members: t.members || [],
+        days: t.days || ALL_DAYS
+      })),
       completions: parsed.completions || {}
     };
   } catch (err) {
@@ -163,7 +188,7 @@ export function StoreProvider({ children }) {
         id: t.id,
         name: t.name,
         points: Number(t.points),
-        frequency: t.frequency,
+        days: sortDays((t.days || ALL_DAYS).map(Number)),
         members: tmRes.data.filter(x => x.task_id === t.id).map(x => x.member_id)
       })),
       completions
@@ -236,14 +261,14 @@ export function StoreProvider({ children }) {
     fetchAll();
   };
 
-  const addTask = async ({ name, points, frequency, members }) => {
+  const addTask = async ({ name, points, days, members }) => {
     if (!online) {
-      setData(d => ({ ...d, tasks: [...d.tasks, { id: newId(), name, points, frequency, members }] }));
+      setData(d => ({ ...d, tasks: [...d.tasks, { id: newId(), name, points, days, members }] }));
       return;
     }
     const { data: rows, error } = await supabase
       .from('tasks')
-      .insert({ name, points, frequency })
+      .insert({ name, points, days })
       .select();
     if (error) return failed('create that task', error);
 
