@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { pinIsSet, changePin, pinLooksValid, PIN_MIN, PIN_MAX } from './pin';
+import { composeTitle, MAX_TITLE } from './appSettings';
 
-export default function Settings({ onUpdateTitle }) {
-  const [customTitle, setCustomTitle] = useState('');
-  const [titlePreview, setTitlePreview] = useState('TaskTrack');
+export default function Settings({ titlePrefix, onUpdateTitle }) {
+  const [customTitle, setCustomTitle] = useState(titlePrefix || '');
+  const [savingTitle, setSavingTitle] = useState(false);
+  const [titleMessage, setTitleMessage] = useState('');
+  const [titleError, setTitleError] = useState('');
 
   const [hasPin, setHasPin] = useState(null);
   const [currentPin, setCurrentPin] = useState('');
@@ -14,11 +17,10 @@ export default function Settings({ onUpdateTitle }) {
   const [savingPin, setSavingPin] = useState(false);
 
   useEffect(() => {
-    const savedTitle = localStorage.getItem('appTitle') || 'TaskTrack';
-    const customPart = savedTitle.replace(' - TaskTrack', '').replace('TaskTrack', '');
-    setCustomTitle(customPart);
-    updatePreview(customPart);
+    setCustomTitle(titlePrefix || '');
+  }, [titlePrefix]);
 
+  useEffect(() => {
     pinIsSet()
       .then(setHasPin)
       .catch(err => {
@@ -28,22 +30,29 @@ export default function Settings({ onUpdateTitle }) {
       });
   }, []);
 
-  const updatePreview = (input) => {
-    if (input && input.toLowerCase() !== 'tasktrack') {
-      setTitlePreview(`${input} - TaskTrack`);
-    } else {
-      setTitlePreview('TaskTrack');
-    }
-  };
-
   const handleTitleChange = (value) => {
-    setCustomTitle(value);
-    updatePreview(value);
+    setCustomTitle(value.slice(0, MAX_TITLE));
+    setTitleMessage('');
+    setTitleError('');
   };
 
-  const handleTitleSave = () => {
-    onUpdateTitle(customTitle);
-    alert(`✓ App title updated to "${titlePreview}"`);
+  const handleTitleSave = async () => {
+    setSavingTitle(true);
+    setTitleMessage('');
+    setTitleError('');
+    try {
+      const saved = await onUpdateTitle(customTitle.trim());
+      if (saved) {
+        setTitleMessage('✓ Saved. Every device will show it.');
+      } else {
+        setTitleError(`Keep it under ${MAX_TITLE} characters.`);
+      }
+    } catch (err) {
+      console.error(err);
+      setTitleError('Could not save the title.');
+    } finally {
+      setSavingTitle(false);
+    }
   };
 
   const onlyDigits = (value, setter) => setter(value.replace(/\D/g, '').slice(0, PIN_MAX));
@@ -101,10 +110,14 @@ export default function Settings({ onUpdateTitle }) {
             className="settings-input"
           />
           <div className="input-hint">
-            💡 Will display as "<strong>{titlePreview}</strong>"
+            💡 Will display as "<strong>{composeTitle(customTitle)}</strong>"
           </div>
-          <button className="btn-save" onClick={handleTitleSave}>
-            Save Title
+
+          {titleError && <div className="error-message">{titleError}</div>}
+          {titleMessage && <div className="input-hint"><strong>{titleMessage}</strong></div>}
+
+          <button className="btn-save" onClick={handleTitleSave} disabled={savingTitle}>
+            {savingTitle ? 'Saving…' : 'Save Title'}
           </button>
         </div>
       </div>

@@ -6,6 +6,10 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: false,
+    // Building while the dev server runs made its watcher crash on EBUSY.
+    watch: {
+      ignored: ['**/dist/**'],
+    },
   },
   build: {
     outDir: 'dist',

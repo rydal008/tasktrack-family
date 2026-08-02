@@ -6,6 +6,7 @@ import Settings from './Settings';
 import PINModal from './PINModal';
 import Review, { pendingQueue } from './Review';
 import { useStore } from './store';
+import { getAppTitle, setAppTitle, composeTitle } from './appSettings';
 
 // How long one PIN entry keeps approving unlocked for.
 const PARENT_UNLOCK_MINUTES = 15;
@@ -16,7 +17,8 @@ function App() {
 
   const [currentPage, setCurrentPage] = useState('leaderboard');
   const [darkMode, setDarkMode] = useState(false);
-  const [appTitle, setAppTitle] = useState('TaskTrack');
+  // Just the custom part; 'TaskTrack' is always appended.
+  const [titlePrefix, setTitlePrefix] = useState('');
   const [showPINModal, setShowPINModal] = useState(false);
   const [pinCallback, setPinCallback] = useState(null);
   // Kept in memory only: reloading the page locks it again.
@@ -30,9 +32,15 @@ function App() {
       document.body.classList.add('dark-mode');
     }
 
-    // Load custom title
-    const savedTitle = localStorage.getItem('appTitle') || 'TaskTrack';
-    setAppTitle(savedTitle);
+    // Show the cached title straight away, then take the shared one as truth.
+    setTitlePrefix(localStorage.getItem('appTitlePrefix') || '');
+
+    getAppTitle()
+      .then(prefix => {
+        setTitlePrefix(prefix);
+        localStorage.setItem('appTitlePrefix', prefix);
+      })
+      .catch(err => console.warn('Could not read the shared title.', err));
   }, []);
 
   const toggleDarkMode = () => {
@@ -46,16 +54,20 @@ function App() {
     }
   };
 
-  const updateAppTitle = (newTitle) => {
-    let fullTitle;
-    if (newTitle && newTitle.toLowerCase() !== 'tasktrack') {
-      fullTitle = `${newTitle} - TaskTrack`;
-    } else {
-      fullTitle = 'TaskTrack';
-    }
-    setAppTitle(fullTitle);
-    localStorage.setItem('appTitle', fullTitle);
+  // Saves for the whole family, not just this device.
+  const updateAppTitle = async (newPrefix) => {
+    const saved = await setAppTitle(newPrefix);
+    if (!saved) return false;
+    setTitlePrefix(newPrefix);
+    localStorage.setItem('appTitlePrefix', newPrefix);
+    return true;
   };
+
+  const appTitle = composeTitle(titlePrefix);
+
+  useEffect(() => {
+    document.title = appTitle === 'TaskTrack' ? 'TaskTrack Family' : appTitle;
+  }, [appTitle]);
 
   // Approving forty chores should not mean typing the PIN forty times.
   const handleRequirePIN = (callback) => {
@@ -118,7 +130,9 @@ function App() {
         {currentPage === 'leaderboard' && <Leaderboard />}
         {currentPage === 'tracker' && <Tracker onRequirePIN={handleRequirePIN} />}
         {currentPage === 'review' && <Review onRequirePIN={handleRequirePIN} />}
-        {currentPage === 'settings' && <Settings onUpdateTitle={updateAppTitle} />}
+        {currentPage === 'settings' && (
+          <Settings titlePrefix={titlePrefix} onUpdateTitle={updateAppTitle} />
+        )}
       </div>
 
       {/* Navigation */}
