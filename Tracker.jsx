@@ -197,13 +197,7 @@ export default function Tracker({ onRequirePIN }) {
   };
 
   const approveEvidence = () => {
-    onRequirePIN((pin) => {
-      if (pin.length >= 4) {
-        finishReview(true);
-      } else {
-        alert('❌ Invalid PIN');
-      }
-    });
+    onRequirePIN(() => finishReview(true));
   };
 
   const openNewTask = () => {

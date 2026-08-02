@@ -53,10 +53,15 @@ function App() {
     setShowPINModal(true);
   };
 
-  const handlePINSubmit = (pin) => {
+  const handlePINSuccess = () => {
     if (pinCallback) {
-      pinCallback(pin);
+      pinCallback();
     }
+    setShowPINModal(false);
+    setPinCallback(null);
+  };
+
+  const handlePINCancel = () => {
     setShowPINModal(false);
     setPinCallback(null);
   };
@@ -104,9 +109,9 @@ function App() {
 
       {/* PIN Modal */}
       {showPINModal && (
-        <PINModal 
-          onSubmit={handlePINSubmit}
-          onCancel={() => setShowPINModal(false)}
+        <PINModal
+          onSuccess={handlePINSuccess}
+          onCancel={handlePINCancel}
         />
       )}
     </div>
